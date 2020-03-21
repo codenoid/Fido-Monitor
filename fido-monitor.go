@@ -17,7 +17,6 @@ import (
 )
 
 var collection *mongo.Collection
-var ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 var homeHTML, _ = template.ParseFiles("./views/index.html")
 var tz, _ = time.LoadLocation("Asia/Jakarta")
 
@@ -30,6 +29,7 @@ func main() {
 		panic(err)
 	}
 
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	fmt.Println("connecting...")
 	err = client.Connect(ctx)
 	fmt.Println("connected...")
@@ -64,6 +64,7 @@ func GetLinkByDate(w http.ResponseWriter, r *http.Request) {
 	startDate, _ := time.ParseInLocation(layoutFormat, query.Get("start"), tz)
 	endDate, _ := time.ParseInLocation(layoutFormat, query.Get("end"), tz)
 
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	cur, err := collection.Find(ctx, bson.M{"_id": bson.M{"$gte": ObjID(startDate), "$lte": ObjID(endDate)}})
 	if err != nil {
 		// https://stackoverflow.com/a/40096757/12985309
@@ -71,10 +72,13 @@ func GetLinkByDate(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("500 - Something bad happened! " + err.Error()))
 		return
 	}
+
+	ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cur.Close(ctx)
 
 	var result []structs.Link
 
+	ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
 	for cur.Next(ctx) {
 		var doc structs.Link
 		err := cur.Decode(&doc)
@@ -98,6 +102,7 @@ func GetLatestLink(w http.ResponseWriter, r *http.Request) {
 	opt.SetBatchSize(15)
 	opt.SetLimit(15)
 
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	cur, err := collection.Find(ctx, bson.M{}, &opt)
 	if err != nil {
 		// https://stackoverflow.com/a/40096757/12985309
@@ -105,10 +110,13 @@ func GetLatestLink(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("500 - Something bad happened! " + err.Error()))
 		return
 	}
+
+	ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cur.Close(ctx)
 
 	var result []structs.Link
 
+	ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
 	for cur.Next(ctx) {
 		var doc structs.Link
 		err := cur.Decode(&doc)
