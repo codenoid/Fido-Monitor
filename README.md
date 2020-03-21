@@ -5,7 +5,7 @@ Monitor your distributed data store
 
 ## Description
 
-Fido-Monitor is part of [Fido](github.com/codenoid/Fido) distributed data store, it's monitor your node & sharding activity
+Fido-Monitor is part of [Fido](https://github.com/codenoid/Fido) distributed data store, it's monitor your node & sharding activity
 
 ## Installation
 
