@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>Fido Monitor | Monitor Your Distributed Data Store</title>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+	<style type="text/css" media="screen">
+		#date {
+			float: right;
+			margin-top: 10px;
+		}
+		#date label {
+			margin-right: 5px;
+		}
+		div#node-usage > .item {
+			background-color: #f5f5f5;
+			padding: 5px 10px 20px;
+			border-radius: 3px;
+			margin-bottom: 10px;
+		}
+		div#node-usage > .item > span {
+			display: block;
+			font-size: 14px;
+			margin-top: -5px;
+			margin-bottom: 10px;
+		}
+	</style>
+	<script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+</head>
+<body>
+
+	<div class="container">
+		<br>
+		<div id="date">
+			<label>Sharded at :</label>
+			<input class="flatpickr"></input>	
+		</div>
+		
+		<h1>FIDO MONITOR</h1>
+		<hr>
+		<div class="row">
+			<div class="col-md-8">
+				<h4>Sharding & File Creation Activity</h4>
+				<div id="activity-chart">
+					
+				</div>
+			</div>
+			<div class="col-md-3">
+				<h4>Files Category</h4>
+				<div id="files-pie">
+					
+				</div>
+			</div>
+		</div>
+
+		<hr>
+
+		<div class="row">
+			<div class="col-md-8">
+				<h4>Latest Files</h4>
+				<ul class="list-group list-group-flush">
+				  	<li class="list-group-item">Cras justo odio</li>
+				  	<li class="list-group-item">Dapibus ac facilisis in</li>
+				  	<li class="list-group-item">Morbi leo risus</li>
+				  	<li class="list-group-item">Porta ac consectetur ac</li>
+				  	<li class="list-group-item">Vestibulum at eros</li>
+				</ul>
+			</div>	
+			<div class="col-md-4">
+				<h4>Node Storage</h4>
+				<div id="node-usage">
+					<div class="item">
+						<b>node-1</b>
+						<span>/mnt/disks/disk-1</span>
+						<div class="progress">
+						  	<div class="progress-bar bg-danger" role="progressbar" style="width: 85%" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100"></div>
+						</div>
+					</div>
+					<div class="item">
+						<b>node-2</b>
+						<span>/mnt/disks/disk-2</span>
+						<div class="progress">
+						  	<div class="progress-bar bg-success" role="progressbar" style="width: 25%" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
+						</div>
+					</div>
+				</div>
+			</div>	
+		</div>
+
+		<footer class="page-footer font-small blue">
+		  	<!-- Copyright -->
+		  	<div class="footer-copyright text-center py-3">© 2020
+		    	<a href="https://github.com/codenoid/Fido">Fido</a> Distributed Data Store
+		  	</div>
+		  	<!-- Copyright -->
+		</footer>
+	</div>
+
+	<script>
+
+		var chart1 = null
+		,	chart2 = null;
+
+		function dateFromObjectId(objectId) {
+			return new Date(parseInt(objectId.substring(0, 8), 16) * 1000);
+		}
+
+		Date.prototype.addDays = function(days) {
+			var date = new Date(this.valueOf());
+			date.setDate(date.getDate() + days);
+			return date;
+		}
+
+		Date.prototype.customFormat = function() {
+			var cdate = new Date(this.valueOf());
+			var d = "0" + (cdate.getMonth()+1).toString().slice(-2)
+			return `${cdate.getDate()}-${d}-${cdate.getFullYear()}`
+		}
+
+		function getDates(startDate, stopDate) {
+			var dateArray = new Array();
+			var currentDate = startDate;
+			while (currentDate <= stopDate) {
+				var cdate = new Date (currentDate);
+				dateArray.push(cdate.customFormat());
+				currentDate = currentDate.addDays(1);
+			}
+			return dateArray;
+		}
+
+		class DomUpdate {
+			constructor(data, dates) {
+				this.data = data;
+				this.dates = dates;
+
+				if ( chart1 != null ) {
+					chart1.destroy()
+				}
+
+				if ( chart2 != null ) {
+					chart2.destroy()
+				}				
+
+			}
+
+			async loadPie() {
+				
+				var files_label = []
+				var files_value  = []
+
+				for ( let file of this.data ) {
+					var mime = file["mime_type"] == "" ? "unknown" : file["mime_type"]
+					if ( files_label.indexOf(mime) == -1 ) {
+						files_label.push(mime)
+						let assignedIdx = files_label.indexOf(mime)
+						files_value[assignedIdx] = 1
+					} else {
+						let assignedIdx = files_label.indexOf(mime)
+						files_value[assignedIdx] += 1
+					}
+				}
+
+				var options = {
+					series: files_value,
+					chart: {
+						width: 380,
+						type: 'pie',
+					},
+					labels: files_label,
+					responsive: [{
+						breakpoint: 480,
+						options: {
+							chart: {
+								width: 200
+							},
+							legend: {
+								position: 'bottom'
+							}
+						}
+					}]
+				};
+
+				var chart1 = new ApexCharts(document.querySelector("#files-pie"), options);
+				chart1.render();
+			}
+		
+			async loadActivity() {
+
+				var data_share = []
+				var data_create = []
+				var data_size = []
+				for ( let _ of this.dates ) { data_share.push(0); data_create.push(0); data_size.push(0); }
+
+				for ( let file of this.data ) {
+					var shared_at = dateFromObjectId(file["id"]).customFormat()
+					var created_at = new Date(file["created_at"] * 1000).customFormat()
+
+					data_share[this.dates.indexOf(shared_at)] += 1
+					data_create[this.dates.indexOf(created_at)] += 1
+					
+					var cds = data_size[this.dates.indexOf(created_at)];
+					data_size[this.dates.indexOf(created_at)] = parseFloat(cds) + parseFloat(file["file_size"]/1000) 
+				}
+				
+				var labels = []
+				for ( let date of this.dates ) {
+					date = date.split("-").reverse().join("-")
+					labels.push(new Date(date).getTime())
+				}
+
+				var options = {
+					series: [{
+						name: 'Sharded File',
+						type: 'column',
+						data: data_share
+					}, {
+						name: 'Sharded Size (mb)',
+						type: 'area',
+						data: data_size
+					}, {
+						name: 'File Creation',
+						type: 'line',
+						data: data_create
+					}],
+					chart: {
+						height: 350,
+						type: 'line',
+						stacked: false,
+					},
+					stroke: {
+						width: [0, 2, 5],
+						curve: 'smooth'
+					},
+					plotOptions: {
+						bar: {
+							columnWidth: '50%'
+						}
+					},
+
+					fill: {
+						opacity: [0.85, 0.25, 1],
+						gradient: {
+							inverseColors: false,
+							shade: 'light',
+							type: "vertical",
+							opacityFrom: 0.85,
+							opacityTo: 0.55,
+							stops: [0, 100, 100, 100]
+						}
+					},
+					labels: labels,
+					markers: {
+						size: 0
+					},
+					xaxis: {
+						type: 'datetime'
+					},
+					yaxis: {
+						title: {
+							text: 'Total',
+						},
+						min: 0,
+						labels: {
+							formatter: function(y) {
+								return parseFloat(y.toFixed(0))
+							},
+						},
+					},
+					tooltip: {
+						shared: true,
+						intersect: false,
+						y: {
+							formatter: function(y) {
+								if (typeof y !== "undefined") {
+									return y.toFixed(0);
+								}
+								return y;
+
+							}
+						}
+					}
+				};
+
+				var chart2 = new ApexCharts(document.querySelector("#activity-chart"), options);
+				chart2.render();
+			}
+		}
+		
+		function loadDashboard(start_date, end_date, dates) {
+			$.get(`/api/link-by-date?start=${start_date}&end=${end_date}`, function(data){
+				const dom = new DomUpdate(data, dates);
+				dom.loadPie()
+				dom.loadActivity()
+			})
+		}
+		
+		$(document).ready(function() {
+			$(".flatpickr").flatpickr({
+				mode: "range",
+			    enableTime: false,
+			    dateFormat: "d-m-Y",
+				defaultDate: [new Date().fp_incr(-7), new Date().fp_incr(1)],
+				onReady: function(selectedDates, dateStr, instance) {
+					var dates = dateStr.split(" to ")
+					if ( dates.length == 2 ) {
+						var datesArr = getDates(selectedDates[0], selectedDates[1])
+						loadDashboard(dates[0], dates[1], datesArr)
+					}
+				},
+				onChange: function(selectedDates, dateStr, instance) {
+					var dates = dateStr.split(" to ")
+					if ( dates.length == 2 ) {
+						var datesArr = getDates(selectedDates[0], selectedDates[1])
+						loadDashboard(dates[0], dates[1], datesArr)
+					}
+				}
+			});
+		})
+	</script>
+		
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+	<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+</body>
+</html>
